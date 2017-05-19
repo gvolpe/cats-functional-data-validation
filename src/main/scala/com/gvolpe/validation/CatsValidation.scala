@@ -1,8 +1,9 @@
 package com.gvolpe.validation
 
-import cats.Apply
+import cats.{Applicative, Apply}
 import cats.data.{Validated, ValidatedNel}
 import cats.data.Validated._
+import cats.syntax.cartesian._
 
 object CatsValidation {
 
@@ -23,19 +24,15 @@ object CatsValidation {
   private def streetNameNotEmpty(name: String): Result[String] =
     notEmpty(name, "Street name must not be empty!")
 
-  def makeAddress(number: Int, name: String): ResultNel[Address] =
-    Apply[ValidatedNel[Error, ?]].map2 (
-      streetNumberGreaterThanZero(number).toValidatedNel,
-      streetNameNotEmpty(name).toValidatedNel
-    ) {
-      case (validNumber, validName) => Address(validNumber, validName)
-    }
+  def makeAddress(number: Int, name: String): ResultNel[Address] = {
+    (streetNumberGreaterThanZero(number).toValidatedNel |@| streetNameNotEmpty(name).toValidatedNel).map(Address.apply)
+  }
 
   private def nameNotEmpty(name: String): Result[String] =
     notEmpty(name, "Name must not be empty!")
 
   def makePerson(name: String, address: ResultNel[Address]): ResultNel[Person] =
-    Apply[ValidatedNel[Error, ?]].map2(
+    Applicative[ValidatedNel[Error, ?]].map2(
       nameNotEmpty(name).toValidatedNel,
       address
     ) {
