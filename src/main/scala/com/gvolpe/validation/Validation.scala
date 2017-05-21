@@ -13,14 +13,14 @@ object Validation {
   type Error      = String
   type Result[A]  = Validation[Error, A]
 
-//  implicit def validationSemigroup[A : Semigroup]: Semigroup[Validation[Error, A]] = new Semigroup[Validation[Error, A]] {
-//    def combine(v1: Validation[Error, A], v2: Validation[Error, A]): Validation[Error, A] = (v1, v2) match {
-//      case (Success(_), s@Success(_)) => s
-//      case (Failure(e1), Failure(e2)) => Failure(Semigroup[Error].combine(e1, e2))
-//      case (_, f@Failure(_))          => f
-//      case (f@Failure(_), _)          => f
-//    }
-//  }
+  implicit def validationSemigroup[T : Semigroup, A]: Semigroup[Validation[T, A]] = new Semigroup[Validation[T, A]] {
+    override def combine(v1: Validation[T, A], v2: Validation[T, A]): Validation[T, A] = (v1, v2) match {
+      case (Success(_), s@Success(_)) => s
+      case (Failure(e1), Failure(e2)) => Failure(Semigroup[T].combine(e1, e2))
+      case (_, f@Failure(_))          => f
+      case (f@Failure(_), _)          => f
+    }
+  }
 
   implicit def validationFunctor[T]: Functor[Validation[T, ?]] = new Functor[Validation[T, ?]] {
     override def map[A, B](fa: Validation[T, A])(f: A => B): Validation[T, B] = fa match {
@@ -53,11 +53,32 @@ object Validation {
   private def streetNameNotEmpty(name: String): Result[String] =
     notEmpty(name, "Street name must not be empty!")
 
+  private def streetNameLength(name: String): Result[String] = {
+    if (name.length > 10) Failure("Street name must not exceed 10 characters!")
+    else Success(name)
+  }
+
+  private def streetNameValidation(name: String): Result[String] =
+    Semigroup[Validation[Error, String]].combine(
+      streetNameNotEmpty(name),
+      streetNameLength(name)
+    )
+
   def makeAddress(number: Int, name: String): Result[Address] = {
-//    val pf = (Address.apply _).curried
-//    val ff = Functor[Validation[Error, ?]].map(streetNumberGreaterThanZero(number))(pf)
-//    Applicative[Validation[Error, ?]].ap(ff)(streetNameNotEmpty(name))
-    (streetNumberGreaterThanZero(number) |@| streetNameNotEmpty(name)).map(Address.apply)
+    (streetNumberGreaterThanZero(number) |@| streetNameValidation(name)).map(Address.apply)
+  }
+
+  private def personNameNotEmpty(name: String): Result[String] =
+    notEmpty(name, "Person name must not be empty!")
+
+  def makePerson(name: String, address: Result[Address]): Result[Person] = {
+    (personNameNotEmpty(name) |@| address).map(Person.apply)
+  }
+
+  def makeAddressAlt(number: Int, name: String): Result[Address] = {
+    val pf = (Address.apply _).curried
+    val ff = Functor[Validation[Error, ?]].map(streetNumberGreaterThanZero(number))(pf)
+    Applicative[Validation[Error, ?]].ap(ff)(streetNameNotEmpty(name))
   }
 
 }
